@@ -1,8 +1,42 @@
 from enums import MetaCommandResult, PrepareResult, StatementType
+from constants import COLUMN_EMAIL_SIZE, COLUMNS_USERNAME_SIZE, PAGE_SIZE, TABLE_MAX_PAGES
+from utilities import size_of_attribute
+from ctypes import c_uint32,  create_string_buffer
+
+
+
+
+class Row():
+    
+    def __init__(self) -> None:
+        self.id = c_uint32()
+        self.username = create_string_buffer(COLUMNS_USERNAME_SIZE)
+        self.email = create_string_buffer(COLUMN_EMAIL_SIZE)
+
+ID_SIZE = size_of_attribute(Row, 'id')
+USERNAME_SIZE = size_of_attribute(Row, 'username')
+EMAIL_SIZE = size_of_attribute(Row, 'email')
+
+# Calculate offsets
+ID_OFFSET = 0
+USERNAME_OFFSET = ID_OFFSET + ID_SIZE
+EMAIL_OFFSET = USERNAME_OFFSET + USERNAME_SIZE
+
+# Calculate total row size
+ROW_SIZE = ID_SIZE + USERNAME_SIZE + EMAIL_SIZE
+
+
+# Total number of rows we can store page is page_size bytes / row_size bytes
+ROWS_PER_PAGE = PAGE_SIZE / ROW_SIZE
+# Total number of rows a table can hold is rows_per_page bytes * 100
+# if I can only store 4 rows in a page then for next page we need another page
+# maximum rows that can be created is rows_per_page * table_max_pages. eg: 4 * 100 = 4000
+TABLE_MAX_ROWS = ROWS_PER_PAGE * TABLE_MAX_PAGES 
 
 
 class Statement():
     type: StatementType = None
+    row_to_insert: Row
 
 def execute_statement(statement: Statement):
     match statement.type:
@@ -20,6 +54,13 @@ def prepare_statement(command: str, statement: Statement):
 
     if command[:6] == 'insert':
         statement.type = StatementType.STATEMENT_INSERT
+        argsAssigned = command.split(' ')
+        if len(argsAssigned) < 4:
+            return PrepareResult.PREPARE_SYNTAX_ERROR
+        
+        statement.row_to_insert.id = argsAssigned[1]
+        statement.row_to_insert.username = argsAssigned[2]
+        statement.row_to_insert.email = argsAssigned[3]
 
         return PrepareResult.PREPARE_SUCCESS
     
